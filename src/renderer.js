@@ -23,6 +23,28 @@ function run(job) {
   });
 }
 
+// Files kept next to the .scad files: meshes/images for import()/surface() and
+// fonts a model ships with. The worker downloads them only when a render needs them.
+const assetUrls = import.meta.glob(
+  '/scads/**/*.{stl,STL,off,obj,3mf,amf,dxf,svg,png,dat,csv,json,ttf,otf,TTF,OTF}',
+  { query: '?url', import: 'default', eager: true },
+);
+
+const dirOf = (path) => path.split('/').slice(0, -1).join('/');
+
+// A file is mounted when the model's source names it; a font is mounted
+// whenever it sits in the model's folder, since text() refers to it by family.
+function assetsForRender(model) {
+  const dir = dirOf('/scads/' + model.path);
+  const assets = [];
+  for (const [path, url] of Object.entries(assetUrls)) {
+    const font = /\.(ttf|otf)$/i.test(path);
+    const name = path.split('/').pop();
+    if (font ? dirOf(path) === dir : model.source.includes(name)) assets.push({ path, url, font });
+  }
+  return assets;
+}
+
 // Every .scad in the library is mounted so include<>/use<> between them works.
 export function buildJob(model, allModels, values, format) {
   const files = {};
@@ -34,7 +56,7 @@ export function buildJob(model, allModels, values, format) {
     defines.push(`${p.name}=${toScadLiteral(v)}`);
   }
   const fonts = fontsForRender(Object.values(files).join('\n'), values);
-  return { files, main: '/scads/' + model.path, defines, format, fonts };
+  return { files, main: '/scads/' + model.path, defines, format, fonts, assets: assetsForRender(model) };
 }
 
 export function render(job) {
@@ -70,6 +92,82 @@ export function summarizeLog(log) {
   const warnings = log.filter((l) => /^(WARNING|DEPRECATED)/.test(l));
   const errors = log.filter((l) => /^(ERROR|EXPORT-ERROR)|Parser error|Execution aborted/i.test(l));
   return { warnings, errors };
+}
+
+// ---------- Background (%) objects ----------
+// OpenSCAD drops `%` objects from every export, so the viewer would never see
+// them. The model is exported as a CSG tree instead (every variable and
+// transform already evaluated), pruned to just the `%` branches with their
+// transforms, and that tree is rendered on its own. Rendering it apart from
+// the model also means a broken mesh there can't break the model's booleans.
+
+const stripCode = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*|"(?:\\.|[^"\\])*"/g, ' ');
+
+// Cheap check so models without `%` skip the extra CSG pass. A modulo after
+// `)` can give a false positive, which only costs that pass.
+export function hasBackground(source) {
+  return /(?:^|[;{})])\s*%/m.test(stripCode(source));
+}
+
+// CSG text -> [{ head, mod, children | null }]
+function parseCsg(text) {
+  let i = 0;
+  const nodes = () => {
+    const list = [];
+    for (;;) {
+      while (i < text.length && /\s/.test(text[i])) i++;
+      if (i >= text.length || text[i] === '}') { i++; return list; }
+      let mod = '';
+      while ('%#!*'.includes(text[i])) mod += text[i++];
+      const start = i;
+      let depth = 0;
+      for (; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"') { for (i++; i < text.length && text[i] !== '"'; i++) if (text[i] === '\\') i++; }
+        else if (c === '(' || c === '[') depth++;
+        else if (c === ')' || c === ']') depth--;
+        else if (!depth && (c === ';' || c === '{')) break;
+      }
+      const head = text.slice(start, i).trim();
+      const open = text[i++] === '{';
+      list.push({ head, mod, children: open ? nodes() : null });
+    }
+  };
+  return nodes();
+}
+
+const csgText = (n) => n.head + (n.children ? ` {\n${n.children.map(csgText).join('\n')}\n}` : ';');
+const KEEP_HEAD = /^(multmatrix|color)\s*\(/;
+
+// Only the `%` branches survive; their ancestors keep transforms and colors,
+// anything else (booleans, groups) becomes a plain group().
+function pruneToBackground(n) {
+  if (n.mod.includes('%')) return { ...n, mod: '' };
+  if (!n.children) return null;
+  const children = n.children.map(pruneToBackground).filter(Boolean);
+  if (!children.length) return null;
+  return { head: KEEP_HEAD.test(n.head) ? n.head : 'group()', mod: '', children };
+}
+
+let bgCache = { key: null, result: null };
+
+// Resolves with { ok, data (binary STL), log } for the `%` objects of a job,
+// or null when the model draws none.
+export async function renderBackground(job) {
+  const csg = await render({ ...job, format: 'csg' });
+  if (!csg.ok) return null;
+  const roots = parseCsg(new TextDecoder().decode(csg.data)).map(pruneToBackground).filter(Boolean);
+  if (!roots.length) return null;
+  // import() records the file's mtime, which changes on every render and
+  // isn't a valid argument when the CSG is read back
+  const source = roots.map(csgText).join('\n').replace(/,\s*timestamp = \d+/g, '');
+  if (bgCache.key !== source) {
+    bgCache = {
+      key: source,
+      result: render({ ...job, files: { ...job.files, '/lab3d_bg.csg': source }, main: '/lab3d_bg.csg', defines: [], format: 'stl' }),
+    };
+  }
+  return bgCache.result;
 }
 
 // ---------- Multi-color export ----------

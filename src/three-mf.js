@@ -27,7 +27,45 @@ export function offToMesh(text) {
   return { vertices, triangles };
 }
 
-const colorCtx = typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
+// Binary STL -> indexed mesh, merging repeated corners
+export function stlToMesh(buffer) {
+  const dv = new DataView(buffer);
+  const count = dv.getUint32(80, true);
+  const index = new Map();
+  const vertices = [];
+  const triangles = [];
+  for (let f = 0; f < count; f++) {
+    for (let k = 0; k < 3; k++) {
+      const o = 84 + f * 50 + 12 + k * 12;
+      const x = dv.getFloat32(o, true), y = dv.getFloat32(o + 4, true), z = dv.getFloat32(o + 8, true);
+      const key = `${x},${y},${z}`;
+      let id = index.get(key);
+      if (id === undefined) {
+        id = vertices.length / 3;
+        index.set(key, id);
+        vertices.push(x, y, z);
+      }
+      triangles.push(id);
+    }
+  }
+  return { vertices, triangles };
+}
+
+// Binary STLs -> one binary STL holding every triangle (no boolean union)
+export function joinStl(buffers) {
+  const count = buffers.reduce((n, b) => n + new DataView(b).getUint32(80, true), 0);
+  const out = new Uint8Array(84 + count * 50);
+  new DataView(out.buffer).setUint32(80, count, true);
+  let at = 84;
+  for (const b of buffers) {
+    const body = new Uint8Array(b, 84, new DataView(b).getUint32(80, true) * 50);
+    out.set(body, at);
+    at += body.length;
+  }
+  return out.buffer;
+}
+
+const colorCtx =typeof document !== 'undefined' ? document.createElement('canvas').getContext('2d') : null;
 
 // CSS/OpenSCAD color name, hex string or [r, g, b(, a)] in 0..1 -> "#RRGGBB"
 export function toHexColor(c) {

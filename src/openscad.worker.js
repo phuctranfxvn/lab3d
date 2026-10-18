@@ -6,7 +6,7 @@ import OpenSCAD from './vendor/openscad.js';
 import wasmUrl from './vendor/openscad.wasm?url';
 
 let wasmModule;
-const fontCache = new Map();
+const fileCache = new Map();
 
 async function getWasmModule() {
   if (!wasmModule) {
@@ -22,11 +22,16 @@ async function getWasmModule() {
   return wasmModule;
 }
 
-async function getFont(font) {
-  if (!fontCache.has(font.url)) {
-    fontCache.set(font.url, fetch(font.url).then((r) => r.arrayBuffer()).then((b) => new Uint8Array(b)));
+function getFile(url) {
+  if (!fileCache.has(url)) {
+    const data = fetch(url).then((r) => {
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${url}`);
+      return r.arrayBuffer();
+    }).then((b) => new Uint8Array(b));
+    data.catch(() => fileCache.delete(url));
+    fileCache.set(url, data);
   }
-  return fontCache.get(font.url);
+  return fileCache.get(url);
 }
 
 function mkdirp(FS, path) {
@@ -38,13 +43,14 @@ function mkdirp(FS, path) {
 }
 
 self.onmessage = async (e) => {
-  const { id, files, main, defines, format, fonts } = e.data;
+  const { id, files, main, defines, format, fonts, assets = [] } = e.data;
   const log = [];
   const started = performance.now();
   try {
-    const [module, fontData] = await Promise.all([
+    const [module, fontData, assetData] = await Promise.all([
       getWasmModule(),
-      Promise.all(fonts.map(async (f) => [f, await getFont(f)])),
+      Promise.all(fonts.map(async (f) => [f, await getFile(f.url)])),
+      Promise.all(assets.map(async (a) => [a, await getFile(a.url)])),
     ]);
 
     const instance = await OpenSCAD({
@@ -65,6 +71,12 @@ self.onmessage = async (e) => {
         mkdirp(FS, path.split('/').slice(0, -1).join('/'));
         FS.writeFile(path, data);
       }
+    }
+
+    for (const [asset, data] of assetData) {
+      mkdirp(FS, asset.path.split('/').slice(0, -1).join('/'));
+      FS.writeFile(asset.path, data);
+      if (asset.font) FS.writeFile('/fonts/' + asset.path.split('/').pop(), data);
     }
 
     for (const [path, content] of Object.entries(files)) {

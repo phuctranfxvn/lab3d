@@ -1,7 +1,7 @@
 import './style.css';
 import { fonts, categories, findFont, missingChars, loadFontFace } from './fonts.js';
-import { buildJob, render, renderLatest, renderColorParts, summarizeLog } from './renderer.js';
-import { build3mf, offToMesh, toHexColor, TARGETS } from './three-mf.js';
+import { buildJob, render, renderLatest, renderColorParts, renderBackground, hasBackground, summarizeLog } from './renderer.js';
+import { build3mf, offToMesh, stlToMesh, joinStl, toHexColor, TARGETS } from './three-mf.js';
 import { parseScad, parseLiteral } from './scad-parser.js';
 import { parseOff } from './off.js';
 import { Viewer } from './viewer.js';
@@ -671,7 +671,8 @@ function renderEditor(model, query) {
 
   async function doRender() {
     stage.classList.add('dim');
-    const res = await renderLatest(buildJob(model, models, values, 'off'));
+    const job = buildJob(model, models, values, 'off');
+    const res = await renderLatest(job);
     if (!res || !alive) return;
     stage.classList.remove('dim');
     showLog(res.log);
@@ -699,6 +700,7 @@ function renderEditor(model, query) {
     viewer.setGeometry(geometry, { fit: first });
     viewer.setColor(currentColor);
     first = false;
+    showBackground(job);
 
     const { min, max } = geometry.boundingBox;
     const size = { x: max.x - min.x, y: max.y - min.y, z: max.z - min.z };
@@ -711,6 +713,16 @@ function renderEditor(model, query) {
     );
     status.className = 'status ok';
     status.replaceChildren(icon('check'), `Đã dựng · ${fmt(res.ms, 0)} ms`);
+  }
+
+  // `%` objects arrive after the model, so a slow one never holds up the preview
+  let bgToken = 0;
+  async function showBackground(job) {
+    if (!hasBackground(model.source)) return;
+    const token = ++bgToken;
+    const res = await renderBackground(job);
+    if (!alive || token !== bgToken) return;
+    viewer.setGhost(res?.ok ? res.data : null);
   }
 
   function showLog(log) {
@@ -753,13 +765,22 @@ function renderEditor(model, query) {
     }
   }
 
+  // The `%` objects shown in the viewer go into downloads too, as separate
+  // shells: they're often meshes OpenSCAD can't union with the model.
+  async function backgroundFor(job) {
+    if (!hasBackground(model.source)) return null;
+    const res = await renderBackground(job);
+    return res?.ok ? res.data : null;
+  }
+
   function download() {
     return withBusy(downloadBtn, async () => {
       try {
-        const res = await render(buildJob(model, models, values, 'stl'));
+        const job = buildJob(model, models, values, 'stl');
+        const [res, bg] = await Promise.all([render(job), backgroundFor(job)]);
         if (!res.ok) throw new Error('render failed');
         const name = `${fileBaseName()}.stl`;
-        saveBlob(new Blob([res.data], { type: 'model/stl' }), name);
+        saveBlob(new Blob([bg ? joinStl([res.data, bg]) : res.data], { type: 'model/stl' }), name);
         toast(`Bảo bối đã về máy: ${name}`);
       } catch {
         toast('Không xuất được STL — xem nhật ký lỗi', 'error');
@@ -772,6 +793,8 @@ function renderEditor(model, query) {
     return withBusy(download3mfBtn, async () => {
       try {
         const parts = await renderColorParts(model, models, values, (msg) => (label3mf.textContent = msg));
+        label3mf.textContent = 'Đang dựng phần nền…';
+        const bg = await backgroundFor(buildJob(model, models, values, 'off'));
         label3mf.textContent = 'Đang đóng gói…';
         const meshes = parts.map((part) => {
           const value = part.color == null ? null : parseLiteral(part.color) ?? part.color.replace(/^"|"$/g, '');
@@ -781,6 +804,7 @@ function renderEditor(model, query) {
             mesh: offToMesh(new TextDecoder().decode(part.data)),
           };
         });
+        if (bg) meshes.push({ name: 'Phần nền', color: FILAMENTS.find((f) => f.name === 'Trắng').hex, mesh: stlToMesh(bg) });
         const name = `${fileBaseName()}.3mf`;
         saveBlob(await build3mf(meshes, { name: model.title, target: target3mf }), name);
         toast(`Bảo bối đã về máy: ${name} (${meshes.length} màu, ${TARGETS[target3mf].label})`);

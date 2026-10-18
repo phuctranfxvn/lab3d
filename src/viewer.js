@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 
@@ -51,7 +52,13 @@ export class Viewer {
     });
     this.edgesMaterial = new THREE.LineBasicMaterial({ color: 0x0b0d12, transparent: true, opacity: 0.35 });
 
+    // `%` objects from the .scad: shown see-through, never exported
+    this.ghostMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb8c2d6, roughness: 0.6, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide,
+    });
+
     this.mesh = null;
+    this.ghost = null;
     this.edges = null;
     this.colorOverride = null;
     this.showEdges = false;
@@ -108,10 +115,41 @@ export class Viewer {
     this.updateEdges();
     this.updateStage();
     // Re-frame on first load, or when the model grew/shrank a lot
-    const extent = geometry.boundingBox.getSize(new THREE.Vector3()).length();
+    const extent = this.bounds().getSize(new THREE.Vector3()).length();
     const ratio = this.fittedExtent ? extent / this.fittedExtent : 0;
     if (fit || firstLoad || ratio > 1.35 || ratio < 0.55) this.fit();
     this.requestRender();
+  }
+
+  // Binary STL of the model's `%` objects, or null to remove them
+  setGhost(stl) {
+    if (stl === this.ghostSource) return;
+    const hadGhost = !!this.ghost;
+    if (this.ghost) {
+      this.scene.remove(this.ghost);
+      this.ghost.geometry.dispose();
+      this.ghost = null;
+    }
+    this.ghostSource = stl;
+    if (stl) {
+      const geometry = new STLLoader().parse(stl);
+      geometry.computeBoundingBox();
+      this.ghost = new THREE.Mesh(geometry, this.ghostMaterial);
+      this.ghost.renderOrder = 1;
+      this.scene.add(this.ghost);
+    }
+    if (this.mesh) {
+      this.updateStage();
+      if (!hadGhost && this.ghost) this.fit();
+    }
+    this.requestRender();
+  }
+
+  // Model plus `%` objects, so framing and the ground include both
+  bounds() {
+    const box = this.mesh.geometry.boundingBox.clone();
+    if (this.ghost) box.union(this.ghost.geometry.boundingBox);
+    return box;
   }
 
   // Single filament color, or null to use the colors from color() in the file
@@ -152,7 +190,7 @@ export class Viewer {
 
   // Ground, grid and light follow the model's footprint
   updateStage() {
-    const box = this.mesh.geometry.boundingBox;
+    const box = this.bounds();
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     const extent = Math.max(size.x, size.y, 20);
@@ -189,7 +227,7 @@ export class Viewer {
 
   fit() {
     if (!this.mesh) return;
-    const box = this.mesh.geometry.boundingBox;
+    const box = this.bounds();
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     this.fittedExtent = box.getSize(new THREE.Vector3()).length();
     const dist = sphere.radius / Math.sin(THREE.MathUtils.degToRad(this.camera.fov / 2)) * 1.05;
@@ -210,7 +248,7 @@ export class Viewer {
   view(name) {
     if (!this.mesh) return;
     const dirs = { iso: [0.45, -0.8, 0.75], top: [0, -0.0001, 1], front: [0, -1, 0.0001], right: [1, 0, 0.0001] };
-    const box = this.mesh.geometry.boundingBox;
+    const box = this.bounds();
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const dist = this.camera.position.distanceTo(this.controls.target);
     const dir = new THREE.Vector3(...dirs[name]).normalize();
@@ -230,6 +268,7 @@ export class Viewer {
     this.resizeObserver?.disconnect();
     this.controls?.dispose();
     this.mesh?.geometry.dispose();
+    this.ghost?.geometry.dispose();
     this.edges?.geometry.dispose();
     this.renderer.dispose();
     this.renderer.domElement.remove();

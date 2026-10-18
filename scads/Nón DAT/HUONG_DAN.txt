@@ -1,0 +1,44 @@
+NON LUOI TRAI - BO FILE OPENSCAD
+=================================
+
+FILE TRONG THU MUC
+  non_day_lai.scad   file chinh, mo bang OpenSCAD
+  than_non.stl       than non, mesh goc tu file 3MF cua ban, khong sua gi
+  vo_than.stl        lop vo cat than chu   (-3.0 mm den +5.2 mm so voi mat non)
+  vo_dinh.stl        lop vo cat dinh chu   (+5.2 mm den +7.0 mm), tao vat canh
+  Baloo2-ExtraBold-Static.ttf   font
+
+TRUOC KHI MO
+  Cai font truoc, neu khong OpenSCAD se thay bang font mac dinh va chu sai het.
+    Windows  chuot phai file TTF > Install
+    macOS    mo bang Font Book > Install Font
+    Linux    chep vao ~/.local/share/fonts roi chay  fc-cache -f
+  Giu ca 4 file STL cung thu muc voi file .scad.
+
+DOI CHU
+  Sua 2 dong dau trong phan Noi dung chu. Go dau tieng Viet binh thuong.
+  Giu nguyen co_dong1 = 39.35 cho moi ten. Thong so nay la CO CHU chu khong
+  phai be rong, nen ten dai ngan gi thi chu van cao bang nhau.
+  Panel truoc chi chua duoc khoang 300 mm be ngang. Ten dai tren 12 ky tu
+  thi giam co_dong1 xuong, moi 10% giam la be rong giam 10%.
+  Tham chieu: co_dong1 = 39.35 thi "Thay Doan" rong 255 mm, "Thay Hoang" rong 284 mm.
+
+XUAT FILE IN
+  Nhan F6 roi File > Export > Export as STL. Ket qua chi co phan CHU.
+  Than non co dau % nen chi hien trong xem truoc, khong nam trong file xuat ra.
+  Day la co y: mesh goc co 5739 manh roi va 64832 canh ho, OpenSCAD khong
+  boolean duoc voi no. Cach lam: nap chu.stl vua xuat cung voi than_non.stl
+  vao slicer. Hai file cung he toa do nen tu khop, khong can can chinh.
+  Muon in thang ti le 11.62% thi doi ti_le = 0.1162 truoc khi xuat.
+
+DO CHINH XAC
+  Than non: nguyen ban 100%, khong mot dinh nao bi doi.
+  Chu bam theo mat cong that cua than non, khong phai mat cau xap xi.
+  Sai lech cua lop vo so voi be mat that trong vung co chu:
+    RMS 0.205 mm, lon nhat +1.157 / -0.842 mm tren model 834.7 mm.
+  Sai lech nay den tu buoc lam min de bo qua duong chi may, co y de chan chu
+  khong bi gon song.
+
+THOI GIAN RENDER
+  OpenSCAD ban 2021 dung CGAL: khoang 3 phut tren may 1 nhan.
+  OpenSCAD 2023 tro len dung Manifold: nhanh hon nhieu lan.
