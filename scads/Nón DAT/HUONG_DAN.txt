@@ -3,7 +3,9 @@ NON LUOI TRAI - BO FILE OPENSCAD
 
 FILE TRONG THU MUC
   non_day_lai.scad   file chinh, mo bang OpenSCAD
-  than_non.stl       than non, mesh goc tu file 3MF cua ban, khong sua gi
+  than_non.stl       than non, mat ngoai vung co chu da lam phang (bo duong chi
+                     may, nep vai) de chu in sac net hon
+  than_non_goc.stl   than non nguyen ban tu file 3MF, khong sua gi (de doi chieu)
   Baloo2-ExtraBold-Static.ttf   font
 
 TRUOC KHI MO
@@ -39,15 +41,21 @@ XUAT FILE IN
   Day la co y: mesh goc co 5739 manh roi va 64832 canh ho, OpenSCAD khong
   boolean duoc voi no. Cach lam: nap chu.stl vua xuat cung voi than_non.stl
   vao slicer. Hai file cung he toa do nen tu khop, khong can can chinh.
-  Muon in thang ti le 11.62% thi doi ti_le = 0.1162 truoc khi xuat.
+  Chon loai_non truoc khi xuat:
+    Non Ecotek       tu dung ti le 0.4 x 29.09% = 0.11636 (~97 mm be ngang)
+    Non Toan Phuong  tu dung ti le 0.4 x 27.9%  = 0.1116  (~93 mm be ngang)
+    Tuy chinh        dung ti_le tu nhap.
+  xoay_tu_the_in (mac dinh bat): file xuat ra da xoay san tu the in
+    X -3.35, Y 58.66, Z 86.86 do (giong "Rotate (absolute)" trong Orca).
+    Non ngua ra sau, mat chu huong len tren nen chu in thanh cac lop tren cung,
+    sac net nhat. Nap vao slicer khong can xoay lai.
 
 DO CHINH XAC
-  Than non: nguyen ban 100%, khong mot dinh nao bi doi.
-  Chu bam theo mat cong that cua than non, khong phai mat cau xap xi.
-  Sai lech cua luoi mat non so voi be mat that trong vung co chu:
-    RMS 0.205 mm, lon nhat +1.157 / -0.842 mm tren model 834.7 mm.
-  Sai lech nay den tu buoc lam min de bo qua duong chi may, co y de chan chu
-  khong bi gon song.
+  Than non: chi cac dinh mat ngoai trong vung chu (|u| < 170, |v| < 92 mm
+  quanh giua mat truoc) duoc dua ve mat min, chuyen tiep dan trong 20 mm o
+  mep. Mat trong, hong non, luoi trai giu nguyen.
+  Chu va than non dung chung mot mat min nen chan chu khop sat mat non.
+  Trong vung chu, mat ngoai than non trung khit voi mat ma chu bam theo.
 
 THOI GIAN RENDER
   OpenSCAD ban 2021 dung CGAL: khoang 3 phut tren may 1 nhan.
