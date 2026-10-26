@@ -1530,6 +1530,7 @@ input[type='range']:active::-webkit-slider-thumb {
 
 .panel-foot {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 14px 16px 18px;
   border-top: 2px dashed var(--line-2);
@@ -1579,6 +1580,26 @@ input[type='range']:active::-webkit-slider-thumb {
 
 .btn.primary:hover {
   background: #ffd54f;
+}
+
+.btn.generate {
+  flex: 1 0 100%;
+  height: 48px;
+  font-family: var(--display);
+  font-size: 17px;
+}
+
+/* Parameters changed since the last build */
+.btn.generate.pending {
+  animation: generate-nudge 1.4s ease-in-out infinite;
+}
+
+@keyframes generate-nudge {
+  50% { background: #ffd54f; box-shadow: var(--pop), 0 0 0 5px rgba(255, 201, 40, 0.35); }
+}
+
+.btn.generate.loading .icon {
+  animation: spin 0.7s linear infinite;
 }
 
 .btn.big {
@@ -1804,6 +1825,7 @@ input[type='range']:active::-webkit-slider-thumb {
 
 .status.ok .icon { color: var(--ok); }
 .status.error { color: var(--err); }
+.status.pending .icon { color: var(--yellow); }
 
 .spinner {
   width: 16px;

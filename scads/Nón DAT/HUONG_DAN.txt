@@ -4,8 +4,6 @@ NON LUOI TRAI - BO FILE OPENSCAD
 FILE TRONG THU MUC
   non_day_lai.scad   file chinh, mo bang OpenSCAD
   than_non.stl       than non, mesh goc tu file 3MF cua ban, khong sua gi
-  vo_than.stl        lop vo cat than chu   (-3.0 mm den +5.2 mm so voi mat non)
-  vo_dinh.stl        lop vo cat dinh chu   (+5.2 mm den +7.0 mm), tao vat canh
   Baloo2-ExtraBold-Static.ttf   font
 
 TRUOC KHI MO
@@ -13,7 +11,7 @@ TRUOC KHI MO
     Windows  chuot phai file TTF > Install
     macOS    mo bang Font Book > Install Font
     Linux    chep vao ~/.local/share/fonts roi chay  fc-cache -f
-  Giu ca 4 file STL cung thu muc voi file .scad.
+  Giu than_non.stl va file font cung thu muc voi file .scad.
 
 DOI CHU
   Sua 2 dong dau trong phan Noi dung chu. Go dau tieng Viet binh thuong.
@@ -22,6 +20,18 @@ DOI CHU
   Panel truoc chi chua duoc khoang 300 mm be ngang. Ten dai tren 12 ky tu
   thi giam co_dong1 xuong, moi 10% giam la be rong giam 10%.
   Tham chieu: co_dong1 = 39.35 thi "Thay Doan" rong 255 mm, "Thay Hoang" rong 284 mm.
+
+DANG CHU
+  om_cong   true = chu om theo mat cong, giu dung be rong chu that tren non.
+            Nhin thang tu truoc, chu o hai ben se hep lai, nhu chu theu that.
+  do_noi    do noi cua chu so voi mat non (mm kich thuoc goc, mac dinh 4).
+            Non mini (ti_le ~0.1): 3-5. Chu thap thi it keo to, canh duoi it xe.
+  bo_tron   ban kinh bo tron mep chu (mac dinh 0 = thanh thang, dinh phang, de in nhat).
+            Chi nen bo tron 2-3.5 khi in to (ti_le tu 0.3 tro len).
+            Lon hon nua thi chu tron day hon, nhung net manh se nhon dinh.
+  so_lop    so lop tao phan bo tron (mac dinh 10). Moi lop chi ~0.1 mm khi in
+            o ti_le 0.4 nen nhin lien mach.
+  Mat non duoc luu dang luoi cao do o cuoi file .scad (LUOI_W), dung sua.
 
 XUAT FILE IN
   Nhan F6 roi File > Export > Export as STL. Ket qua chi co phan CHU.
@@ -34,7 +44,7 @@ XUAT FILE IN
 DO CHINH XAC
   Than non: nguyen ban 100%, khong mot dinh nao bi doi.
   Chu bam theo mat cong that cua than non, khong phai mat cau xap xi.
-  Sai lech cua lop vo so voi be mat that trong vung co chu:
+  Sai lech cua luoi mat non so voi be mat that trong vung co chu:
     RMS 0.205 mm, lon nhat +1.157 / -0.842 mm tren model 834.7 mm.
   Sai lech nay den tu buoc lam min de bo qua duong chi may, co y de chan chu
   khong bi gon song.

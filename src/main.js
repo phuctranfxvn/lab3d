@@ -384,6 +384,7 @@ function renderEditor(model, query) {
   // --- params column ---
   const resetAllBtn = h('button', { class: 'btn ghost', onclick: resetAll }, icon('reset'), 'Mặc định');
   const shareBtn = h('button', { class: 'btn ghost', onclick: share }, icon('link'), 'Chia sẻ');
+  const generateBtn = h('button', { class: 'btn primary generate', title: 'Dựng mô hình (Ctrl/⌘ + Enter)', onclick: () => generate() }, icon('bolt'), h('span', {}, 'Generate'));
 
   const panel = h('aside', { class: 'panel' },
     h('div', { class: 'panel-head' },
@@ -393,11 +394,11 @@ function renderEditor(model, query) {
       h('code', { class: 'file' }, 'scads/' + model.path),
     ),
     h('div', { class: 'groups' }, model.groups.map((g, i) => buildGroup(g, i))),
-    h('div', { class: 'panel-foot' }, resetAllBtn, shareBtn),
+    h('div', { class: 'panel-foot' }, generateBtn, resetAllBtn, shareBtn),
   );
 
   app.replaceChildren(
-    header(h('div', { class: 'topbar-right' }, h('span', { class: 'pill' }, icon('bolt'), 'Dựng tức thì · OpenSCAD'))),
+    header(h('div', { class: 'topbar-right' }, h('span', { class: 'pill' }, icon('bolt'), 'Dựng bằng OpenSCAD'))),
     h('main', { class: 'editor' }, panel, viewerCol),
   );
 
@@ -633,7 +634,7 @@ function renderEditor(model, query) {
     controls.get(p.name).set(v);
     if (p.type === 'string') for (const c of controls.values()) c.row.refreshSample?.();
     history.replaceState(null, '', queryFor(model, values));
-    scheduleRender();
+    markDirty();
   }
 
   function resetAll() {
@@ -643,7 +644,7 @@ function renderEditor(model, query) {
     }
     for (const c of controls.values()) c.row.refreshSample?.();
     history.replaceState(null, '', queryFor(model, values));
-    scheduleRender();
+    markDirty();
   }
 
   async function share() {
@@ -658,22 +659,42 @@ function renderEditor(model, query) {
 
   // --- rendering ---
 
-  let timer;
+  // Parameter edits only mark the model as changed; it is rebuilt when
+  // Generate is pressed (or Ctrl/Cmd + Enter), so heavy models don't render on every keystroke.
   let first = true;
   let alive = true;
+  let dirty = false;
 
-  function scheduleRender() {
-    clearTimeout(timer);
+  function markDirty() {
+    dirty = true;
+    generateBtn.classList.add('pending');
+    if (generateBtn.classList.contains('loading')) return;
+    status.className = 'status pending';
+    status.replaceChildren(icon('alert'), 'Thông số đã đổi · nhấn Generate');
+  }
+
+  async function generate() {
+    dirty = false;
+    generateBtn.classList.remove('pending');
+    generateBtn.classList.add('loading');
     status.className = 'status busy';
     status.replaceChildren(h('span', { class: 'spinner' }), 'Đang lục túi…');
-    timer = setTimeout(doRender, first ? 0 : 250);
+    // `false` means a newer Generate replaced this one and owns the button now
+    if (await doRender() === false) return;
+    generateBtn.classList.remove('loading');
+    if (dirty) markDirty();
   }
+
+  const onKey = (e) => {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); generate(); }
+  };
+  document.addEventListener('keydown', onKey);
 
   async function doRender() {
     stage.classList.add('dim');
     const job = buildJob(model, models, values, 'off');
     const res = await renderLatest(job);
-    if (!res || !alive) return;
+    if (!res || !alive) return false;
     stage.classList.remove('dim');
     showLog(res.log);
 
@@ -817,12 +838,12 @@ function renderEditor(model, query) {
   }
 
 
-  scheduleRender();
+  generate();
 
   cleanup = () => {
     alive = false;
     document.removeEventListener('click', closeMenu);
-    clearTimeout(timer);
+    document.removeEventListener('keydown', onKey);
     viewer.dispose();
   };
 }
